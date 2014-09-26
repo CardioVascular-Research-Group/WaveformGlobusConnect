@@ -5,5 +5,6 @@
 	<classpathentry kind="lib" path="lib/log4j.jar"/>
 	<classpathentry kind="lib" path="lib/TransferAPIClient.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="lib/java-nexus-client.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
