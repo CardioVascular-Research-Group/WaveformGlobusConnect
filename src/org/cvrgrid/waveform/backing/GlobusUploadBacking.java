@@ -1,4 +1,4 @@
-/* Copyright 2013 Cardiovascular Research Grid
+/* Copyright 2013, 2014 Cardiovascular Research Grid
  * 
  * Licensed under the Apache License, Version 2.0 (the "License"); 
  * you may not use this file except in compliance with the License. 
@@ -37,11 +37,12 @@ import org.rsna.ctp.pipeline.Status;
 
 /*
  * This is the backing bean class to transfer local Waveform files using Globus Connect.
- * It is a variation of the CTP-GlobusExportService written by Dina Sulakhe.
- * The purpose of this bean is to use the models included in this software package.
+ * It is a variation of the CTP-GlobusExportService written by Dina Sulakhe, coupling it with
+ * the Java Nexus Client written by Chris Jurado and extended by Josh Bryan.
+ * The purpose of this bean is to use the models included in this software package,
  * populating them with information that can be returned from a number of Globus REST services.
  * 
- * The tool requires the bcprov_ext_jdk16_146, log4j and TransferAPIClient libraries and 
+ * The tool requires the bcprov_ext_jdk16_146, log4j, TransferAPIClient and java-nexus-client libraries and 
  * the org.rsna.ctp.pipeline.Status class (included) to function properly.
  */
 
@@ -57,18 +58,19 @@ public class GlobusUploadBacking {
 
 		try {
 
-			JSONTransferAPIClient client = new JSONTransferAPIClient(globusConnectConfiguration.getGlobusOnlineUsername(), globusConnectConfiguration.getCaFile(), globusConnectConfiguration.getCertFile(), globusConnectConfiguration.getKeyFile());
+			//JSONTransferAPIClient client = new JSONTransferAPIClient(globusConnectConfiguration.getGlobusOnlineUsername(), globusConnectConfiguration.getCaFile(), globusConnectConfiguration.getCertFile(), globusConnectConfiguration.getKeyFile());
+			JSONTransferAPIClient client = globusConnectConfiguration.getClient();
 			getGlobusConnectEndpoints(client);
 			for (GlobusEndpoint e : getGlobusEndpointLists().get("GC").getGlobusEndpoints()) {
-				System.out.print(e.getName() + " ");
+				logger.info(e.getName() + " ");
 				for (GlobusServer s : e.getGlobusServers()) {
-					System.out.println("Connected: " + s.getIsConnected());
+					logger.info("Connected: " + s.getIsConnected());
 				}
 			}
 			getGcmuEndpoints(client);
 			for (GlobusEndpoint e : getGlobusEndpointLists().get("GCMU").getGlobusEndpoints()) {
-				System.out.print(e.getName() + " ");
-				System.out.println("Activated: " + e.getActivated());
+				logger.info(e.getName() + " ");
+				logger.info("Activated: " + e.getActivated());
 			}
 
 
@@ -83,7 +85,7 @@ public class GlobusUploadBacking {
 	}
 
 	/**
-	 * Private API that polls the Globus Connect endpoints for a user.
+	 * Private API that polls the Globus Connect Personal endpoints for a user.
 	 */
 	private Status getGlobusConnectEndpoints(JSONTransferAPIClient client) {
 
@@ -98,7 +100,7 @@ public class GlobusUploadBacking {
 	}
 
 	/**
-	 * Private API that polls the Globus Connect Multi-User endpoints for a user.
+	 * Private API that polls the Globus Connect Server endpoints for a user.
 	 */
 	private Status getGcmuEndpoints(JSONTransferAPIClient client) {
 
@@ -123,7 +125,7 @@ public class GlobusUploadBacking {
 			JSONTransferAPIClient.Result r = client.getResult(query);
 			Map<String, GlobusEndpointList> globusEndpointLists = this.getGlobusEndpointLists();
 			GlobusEndpointList globusEndpointList = globusEndpointLists.get(endpointType);
-			System.out.println("Endpoint Listing " + query + " for " + client.getUsername() + ": ");
+			logger.info("Endpoint Listing " + query + " for " + client.getUsername() + ": ");
 			Iterator<?> keys = r.document.keys();
 			while(keys.hasNext()) {
 				String next = (String) keys.next();

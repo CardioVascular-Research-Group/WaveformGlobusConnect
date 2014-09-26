@@ -1,4 +1,4 @@
-/* Copyright 2013 Cardiovascular Research Grid
+/* Copyright 2013, 2014 Cardiovascular Research Grid
  * 
  * Licensed under the Apache License, Version 2.0 (the "License"); 
  * you may not use this file except in compliance with the License. 
@@ -17,6 +17,13 @@
  * 	@author Stephen J Granite (Email: sgranite@jhu.edu)
  */
 package org.cvrgrid.waveform.model;
+
+/*
+ * This is a model class for use in the transfer of local Waveform files using Globus Connect.
+ * The purpose of this model is to capture results returned from an endpoint_list provided by the 
+ * Globus REST API.
+ */
+
 
 public class GlobusLink {
 

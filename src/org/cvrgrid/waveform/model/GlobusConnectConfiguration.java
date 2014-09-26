@@ -1,4 +1,4 @@
-/* Copyright 2013 Cardiovascular Research Grid
+/* Copyright 2013, 2014 Cardiovascular Research Grid
  * 
  * Licensed under the Apache License, Version 2.0 (the "License"); 
  * you may not use this file except in compliance with the License. 
@@ -19,15 +19,19 @@
 package org.cvrgrid.waveform.model;
 
 import java.io.Serializable;
+import org.globusonline.transfer.JSONTransferAPIClient;
+
+/*
+ * This is a model class for use in the transfer of local Waveform files using Globus Connect.
+ * The purpose of this model is to use the properties and store variables 
+ * for use in other sections of the main class.
+ */
 
 public class GlobusConnectConfiguration implements Serializable {
 
 	private static final long serialVersionUID = 6721093052749142738L;
 	private String globusOnlineUsername;
 	private String globusOnlinePassword;
-	private String certFile;
-	private String keyFile;
-	private String caFile;
 	private String sourceEP;
 	private String sourceRoot;
 	private String sourceUsername;
@@ -36,7 +40,9 @@ public class GlobusConnectConfiguration implements Serializable {
 	private String destinationRoot;
 	private String destinationUsername;
 	private String destinationPassword;
+	private String destinationMyProxy;
 	private String windowsGCVersion;
+	private JSONTransferAPIClient client;
 
 	public GlobusConnectConfiguration() {
 		
@@ -65,42 +71,6 @@ public class GlobusConnectConfiguration implements Serializable {
 	 */
 	public void setGlobusOnlinePassword(String globusOnlinePassword) {
 		this.globusOnlinePassword = globusOnlinePassword;
-	}
-	/**
-	 * @return the certFile
-	 */
-	public String getCertFile() {
-		return certFile;
-	}
-	/**
-	 * @param certFile the certFile to set
-	 */
-	public void setCertFile(String certFile) {
-		this.certFile = certFile;
-	}
-	/**
-	 * @return the keyFile
-	 */
-	public String getKeyFile() {
-		return keyFile;
-	}
-	/**
-	 * @param keyFile the keyFile to set
-	 */
-	public void setKeyFile(String keyFile) {
-		this.keyFile = keyFile;
-	}
-	/**
-	 * @return the caFile
-	 */
-	public String getCaFile() {
-		return caFile;
-	}
-	/**
-	 * @param caFile the caFile to set
-	 */
-	public void setCaFile(String caFile) {
-		this.caFile = caFile;
 	}
 	/**
 	 * @return the sourceEP
@@ -199,6 +169,18 @@ public class GlobusConnectConfiguration implements Serializable {
 		this.destinationPassword = destinationPassword;
 	}
 	/**
+	 * @return the destinationMyProxy
+	 */
+	public String getDestinationMyProxy() {
+		return destinationMyProxy;
+	}
+	/**
+	 * @param destinationMyProxy the destinationMyProxy to set
+	 */
+	public void setDestinationMyProxy(String destinationMyProxy) {
+		this.destinationMyProxy = destinationMyProxy;
+	}
+	/**
 	 * @return the windowsGCVersion
 	 */
 	public String getWindowsGCVersion() {
@@ -210,6 +192,17 @@ public class GlobusConnectConfiguration implements Serializable {
 	public void setWindowsGCVersion(String windowsGCVersion) {
 		this.windowsGCVersion = windowsGCVersion;
 	}
+	/**
+	 * @return the client
+	 */
+	public JSONTransferAPIClient getClient() {
+		return client;
+	}
+	/**
+	 * @param client the client to set
+	 */
+	public void setClient(JSONTransferAPIClient client) {
+		this.client = client;
+	}
 
-	
 }
