@@ -23,6 +23,8 @@
 package org.cvrgrid.waveform;
 import java.io.File;
 import java.io.IOException;
+
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.cvrgrid.waveform.backing.GlobusUploadBacking;
 import org.cvrgrid.waveform.model.GlobusConnectConfiguration;
@@ -94,13 +96,15 @@ public class WaveformGlobusConnect {
 	public WaveformGlobusConnect(){		 
 
 		try {
-
+			logger.setLevel(Level.INFO);
 			GlobusConnectConfiguration globusConnectConfiguration = new GlobusConnectConfiguration();
 			Properties serverProperties = new Properties();
 			InputStream stream = WaveformGlobusConnect.class.getResourceAsStream(this.getConfigFilename());
 			serverProperties.load(stream);
 			globusConnectConfiguration.setGlobusOnlineUsername(serverProperties.getProperty("globusOnlineUsername"));
 			globusConnectConfiguration.setGlobusOnlinePassword(serverProperties.getProperty("globusOnlinePassword"));
+			globusConnectConfiguration.setSourceUsername(serverProperties.getProperty("sourceUsername"));
+			globusConnectConfiguration.setSourcePassword(serverProperties.getProperty("sourcePassword"));
 			globusConnectConfiguration.setSourceEP(serverProperties.getProperty("sourceEP"));
 			globusConnectConfiguration.setSourceRoot(serverProperties.getProperty("sourceRoot"));
 			globusConnectConfiguration.setDestinationEP(serverProperties.getProperty("destinationEP"));
@@ -133,18 +137,32 @@ public class WaveformGlobusConnect {
 
 	/**
 	 * Main class meant to invoke the code from the command line.
+	 * The 7 input parameters should be: 
+	 * 	SourceRoot - Absolute directory of the Globus Connect Personal on this machine. e.g. "/home/WIN/mshipwa1/Downloads/samples/ECGtestData"
+	 * 	DestinationRoot - (Relative or Absolute) directory on the Globus Server that the files will be sent to. e.g. "~/wftest/" or "/home/WIN/cvrgglobusproc/wftest/"
+	 * 	GlobusOnlineUsername - Globus usename as you'd used to log into the Globus Tranfer web page. e.g. "wftest" 
+	 * 	GlobusOnlinePassword - Globus password as you'd used to log into the Globus Tranfer web page.
+	 * 	DestinationUsername  - Username on the Globus Server that the files will be sent to. e.g. "cvrgglobusproc" 
+	 * 	DestinationPassword - Password on the Globus Server that the files will be sent to. 
+	 * 	DestinationMyProxy - The destination proxy used to activate the destination endpoint. e.g. "gcmu-02.cvrgrid.org"
 	 */
 	public static void main(String[] args) {
 
 		WaveformGlobusConnect waveformGlobusConnect = new WaveformGlobusConnect();
 		GlobusConnectConfiguration globusConnectConfiguration = waveformGlobusConnect.getGlobusConnectConfiguration();
-		globusConnectConfiguration.setSourceRoot(args[0]);
-		globusConnectConfiguration.setDestinationRoot(args[1]);
-		globusConnectConfiguration.setGlobusOnlineUsername(args[2]);
-		globusConnectConfiguration.setGlobusOnlinePassword(args[3]);
-		globusConnectConfiguration.setDestinationUsername(args[4]);
-		globusConnectConfiguration.setDestinationPassword(args[5]);
-		globusConnectConfiguration.setDestinationMyProxy(args[6]);
+		try{
+			globusConnectConfiguration.setSourceRoot(args[0]);
+			globusConnectConfiguration.setDestinationRoot(args[1]);
+			globusConnectConfiguration.setGlobusOnlineUsername(args[2]);
+			globusConnectConfiguration.setGlobusOnlinePassword(args[3]);
+			globusConnectConfiguration.setDestinationUsername(args[4]);
+			globusConnectConfiguration.setDestinationPassword(args[5]);
+			globusConnectConfiguration.setDestinationMyProxy(args[6]);
+		}catch(Exception arrayex){
+			arrayex.printStackTrace();
+			System.out.println("input parameters should be: SourceRoot DestinationRoot GlobusOnlineUsername GlobusOnlinePassword DestinationUsername DestinationPassword DestinationMyProxy");
+			System.exit(0);
+		}
 		GoauthClient cli = new GoauthClient("nexus.api.globusonline.org", "https://www.globusonline.org", args[2], args[3]);
 		cli.setIgnoreCertErrors(true);
 		String accessToken = null;
@@ -167,9 +185,9 @@ public class WaveformGlobusConnect {
 			client.setAuthenticator(authenticator);
 			globusConnectConfiguration.setClient(client);
 		} catch (Exception e) {
-			logger.error("Got an exception..\n");
-			logger.error(e.getMessage());
-			logger.error(e.getStackTrace().toString());
+			System.err.println("Got an exception..\n");
+			System.err.println(e.getMessage());
+			System.err.println(e.getStackTrace().toString());
 
 			e.printStackTrace();
 		}
@@ -177,13 +195,13 @@ public class WaveformGlobusConnect {
 		GlobusUploadBacking globusUploadBacking = new GlobusUploadBacking(globusConnectConfiguration);
 		if (waveformGlobusConnect.isOnlineGC(globusConnectConfiguration, globusUploadBacking)) {
 			if(!waveformGlobusConnect.isOnlineGCMU(globusConnectConfiguration, globusUploadBacking)) {
-				logger.info(globusConnectConfiguration.getDestinationEP() + " needs to be activated for data to transfer from " + globusConnectConfiguration.getSourceEP());
+				System.out.println(globusConnectConfiguration.getDestinationEP() + " needs to be activated for data to transfer from " + globusConnectConfiguration.getSourceEP());
 				waveformGlobusConnect.activateEP(globusConnectConfiguration, globusConnectConfiguration.getDestinationUsername(), globusConnectConfiguration.getDestinationPassword(), globusConnectConfiguration.getDestinationEP());
 			}
-			logger.info("Transferring data from " + globusConnectConfiguration.getSourceEP() + " to " + globusConnectConfiguration.getDestinationEP());
-			logger.info(waveformGlobusConnect.export(globusConnectConfiguration));
+			System.out.println("Transferring data from " + globusConnectConfiguration.getSourceEP() + " to " + globusConnectConfiguration.getDestinationEP());
+			System.out.println(waveformGlobusConnect.export(globusConnectConfiguration));
 		} else {
-			logger.info(globusConnectConfiguration.getSourceEP() + " needs to be connected for data to transfer to " + globusConnectConfiguration.getDestinationEP());	
+			System.out.println(globusConnectConfiguration.getSourceEP() + " needs to be connected for data to transfer to " + globusConnectConfiguration.getDestinationEP());	
 		}
 
 	}
@@ -192,11 +210,15 @@ public class WaveformGlobusConnect {
 	 * Public API intended for invocation of the GlobusExportService written by Dina
 	 */
 	public Status export(GlobusConnectConfiguration globusConnectConfiguration) {
-
-		File directoryToSend = new File(globusConnectConfiguration.getSourceRoot());
-		List<File> files = new ArrayList<File>(Arrays.asList(directoryToSend.listFiles()));
-		return this.export(globusConnectConfiguration, files);
-
+		try{
+			File directoryToSend = new File(globusConnectConfiguration.getSourceRoot());
+			System.out.println("Absolute souce path: " + directoryToSend.getAbsolutePath());
+			List<File> files = new ArrayList<File>(Arrays.asList(directoryToSend.listFiles()));
+			return this.export(globusConnectConfiguration, files);
+		}catch(NullPointerException npex){
+			System.out.println("export() - No files found in source root: " + globusConnectConfiguration.getSourceRoot());
+			return null;
+		}
 	}
 
 	/**
@@ -217,18 +239,18 @@ public class WaveformGlobusConnect {
 
 			//Activate source endpoint
 			if(this.activateEP(globusConnectConfiguration, sourceUsername, sourcePassword, sourceEP).equals(Status.FAIL)){
-				logger.info("Source EP Activation failed..");
+				System.out.println("Source EP Activation failed..");
 				return Status.FAIL;
 			}
 
 
 			//Activate destination endpoint
 			if(this.activateEP(globusConnectConfiguration, destinationUsername, destinationPassword, destinationEP).equals(Status.FAIL)) {
-				logger.info("Destination EP Activation failed..");
+				System.out.println("Destination EP Activation failed..");
 				return Status.FAIL;
 			}
 
-			logger.info("GO Endpoints Activation was successful..");
+			System.out.println("GO Endpoints Activation was successful..");
 
 
 			JSONTransferAPIClient.Result result = client.getResult("/transfer/submission_id");
@@ -260,13 +282,13 @@ public class WaveformGlobusConnect {
 					// version of the GC and append /cygdrive to path.
 					// The rest of the code in this if-loop should be deleted once GC bug is fixed.
 					if(this.checkIfOldWindowsGC(globusConnectConfiguration, file).equals("old")){
-						//logger.info("It might be an older version of GC, Trying cygdrive based configuration..");
+						//System.out.println("It might be an older version of GC, Trying cygdrive based configuration..");
 						sPath = "/cygdrive" + sPath;
 					}
 
 				}
 
-				//logger.info("File to be transferred: " + sPath);
+				//System.out.println("File to be transferred: " + sPath);
 				JSONObject item = new JSONObject();
 				item.put("DATA_TYPE", "transfer_item");
 				item.put("source_endpoint", sourceEP);
@@ -281,17 +303,17 @@ public class WaveformGlobusConnect {
 
 			result = client.postResult("/transfer", transfer, null);
 
-			logger.info("Initiating Globus Online Transfer..");
+			System.out.println("Initiating Globus Online Transfer..");
 
 		} catch (Exception e) {
-			logger.error("Got an exception..\n");
-			logger.error(e.getMessage());
-			logger.error(e.getStackTrace().toString());
+			System.err.println("Got an exception..\n");
+			System.err.println(e.getMessage());
+			System.err.println(e.getStackTrace().toString());
 
 			e.printStackTrace();
 			return Status.FAIL;
 		}
-		logger.info("Transfer complete..");
+		System.out.println("Transfer complete..");
 		return Status.OK;
 
 	}
@@ -303,49 +325,49 @@ public class WaveformGlobusConnect {
 
 		String myProxy = globusConnectConfiguration.getDestinationMyProxy();
 
-		logger.info("Activating Endpoint: " + endpoint);
+		System.out.println("Activating Endpoint: " + endpoint);
 		try {
 
 			JSONTransferAPIClient client = globusConnectConfiguration.getClient();  
 			org.globusonline.transfer.Example GOClient = new Example(client);
 
 			if(EpUsername == null || EpUsername == ""){
-				logger.info("EP username and password is null. Attempting Autoactivations without username/passwd.");
+				System.out.println("EP username and password is null. Attempting Autoactivations without username/passwd.");
 				if (!GOClient.autoActivate(endpoint)) {
-					logger.error("Unable to auto activate GO endpoint : " + endpoint);                               
+					System.err.println("Unable to auto activate GO endpoint : " + endpoint);                               
 					return Status.FAIL;
 				}
 			}else{
 				if (myproxyActivateEP(client, EpUsername, EpPassword, endpoint, myProxy).equals(Status.FAIL)){
-					logger.error("Unable to activate GO endpoint : " + endpoint);                               
+					System.err.println("Unable to activate GO endpoint : " + endpoint);                               
 					return Status.FAIL;					
 				}
 			}
 			return Status.OK;
 
 		} catch (IOException e) {
-			logger.error("Got an IO exception..\n");
-			logger.error(e.getMessage());
-			logger.error(e.getStackTrace().toString());
+			System.err.println("Got an IO exception..\n");
+			System.err.println(e.getMessage());
+			System.err.println(e.getStackTrace().toString());
 
 			e.printStackTrace();
 			return Status.FAIL;
 		} catch (JSONException e) {
-			logger.error("Got an JSON exception..\n");
-			logger.error(e.getMessage());
-			logger.error(e.getStackTrace().toString());
+			System.err.println("Got an JSON exception..\n");
+			System.err.println(e.getMessage());
+			System.err.println(e.getStackTrace().toString());
 			e.printStackTrace();
 			return Status.FAIL;
 		} catch (GeneralSecurityException e) {
-			logger.error("Got an Security exception..\n");
-			logger.error(e.getMessage());
-			logger.error(e.getStackTrace().toString());
+			System.err.println("Got an Security exception..\n");
+			System.err.println(e.getMessage());
+			System.err.println(e.getStackTrace().toString());
 			e.printStackTrace();
 			return Status.FAIL;
 		} catch (APIError e) {
-			logger.error("Got an APIError exception..\n");
-			logger.error(e.getMessage());
-			logger.error(e.getStackTrace().toString());
+			System.err.println("Got an APIError exception..\n");
+			System.err.println(e.getMessage());
+			System.err.println(e.getStackTrace().toString());
 			e.printStackTrace();
 			return Status.FAIL;
 		}				
@@ -358,7 +380,7 @@ public class WaveformGlobusConnect {
 				String myproxyHostname)
 		{
 	
-			logger.info("Activating Endpoint using myproxy: " + endpointName);
+			System.out.println("Activating Endpoint using myproxy: " + endpointName);
 	
 			try {
 				String url = client.endpointPath(endpointName) + "/activation_requirements";
@@ -366,6 +388,7 @@ public class WaveformGlobusConnect {
 	
 				// Go through requirements and find the myproxy type, then fill
 				// in with the values from the function^Wmethod parameters.
+				System.out.println("Endpoint activated:" + r.document.getString("activated") );
 				JSONArray reqsArray = r.document.getJSONArray("DATA");
 				for (int i=0; i < reqsArray.length(); i++) {
 					JSONObject reqObject = reqsArray.getJSONObject(i);
@@ -392,34 +415,35 @@ public class WaveformGlobusConnect {
 	
 				// return r; yge: should check on r to determine what to return
 				if (r.statusCode >= 400) {
-					logger.error("Returned statusCode >=400 : " + r.statusCode + "\n");
+					
+					System.err.println("Returned statusCode >=400 : " + r.statusCode + "\n");
 					return Status.FAIL;
 				}
 				return Status.OK;
 	
 			} catch (IOException e) {
-				logger.error("Got an IO exception..\n");
-				logger.error(e.getMessage());
-				logger.error(e.getStackTrace().toString());
+				System.err.println("Got an IO exception..\n");
+				System.err.println(e.getMessage());
+				System.err.println(e.getStackTrace().toString());
 	
 				e.printStackTrace();
 				return Status.FAIL;
 			} catch (JSONException e) {
-				logger.error("Got an JSON exception..\n");
-				logger.error(e.getMessage());
-				logger.error(e.getStackTrace().toString());
+				System.err.println("Got an JSON exception..\n");
+				System.err.println(e.getMessage());
+				System.err.println(e.getStackTrace().toString());
 				e.printStackTrace();
 				return Status.FAIL;
 			} catch (GeneralSecurityException e) {
-				logger.error("Got an Security exception..\n");
-				logger.error(e.getMessage());
-				logger.error(e.getStackTrace().toString());
+				System.err.println("Got an Security exception..\n");
+				System.err.println(e.getMessage());
+				System.err.println(e.getStackTrace().toString());
 				e.printStackTrace();
 				return Status.FAIL;
 			} catch (APIError e) {
-				logger.error("Got an APIError exception..\n");
-				logger.error(e.getMessage());
-				logger.error(e.getStackTrace().toString());
+				System.err.println("Got an APIError exception..\n");
+				System.err.println(e.getMessage());
+				System.err.println(e.getStackTrace().toString());
 				e.printStackTrace();
 				return Status.FAIL;
 			}			
@@ -450,17 +474,17 @@ public class WaveformGlobusConnect {
 						+ (sourceEP.contains("#") ? sourceEP.split("#")[1] : sourceEP)+ "/ls", null, pathMap);
 
 				if(listing.statusCode == 400){
-					logger.info("It might be an older version of GC, Trying cygdrive based configuration..");
+					System.out.println("It might be an older version of GC, Trying cygdrive based configuration..");
 					globusConnectConfiguration.setWindowsGCVersion("old");
 				}else{
-					logger.info("It seems to be a newer version of GC..");
+					System.out.println("It seems to be a newer version of GC..");
 					globusConnectConfiguration.setWindowsGCVersion("new");
 				}
 
 			} catch (Exception e) {
-				logger.error("Got an exception..\n");
-				logger.error(e.getMessage());
-				logger.error(e.getStackTrace().toString());
+				System.err.println("Got an exception..\n");
+				System.err.println(e.getMessage());
+				System.err.println(e.getStackTrace().toString());
 			}
 		}
 
