@@ -288,7 +288,7 @@ public class WaveformGlobusConnect {
 
 				}
 
-				//System.out.println("File to be transferred: " + sPath);
+				//System.out.println("File to be transferred: " + sPath); 
 				JSONObject item = new JSONObject();
 				item.put("DATA_TYPE", "transfer_item");
 				item.put("source_endpoint", sourceEP);
