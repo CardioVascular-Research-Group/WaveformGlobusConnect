@@ -24,6 +24,8 @@ package org.cvrgrid.waveform;
 import java.io.File;
 import java.io.IOException;
 
+//import org.apache.commons.io;
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.cvrgrid.waveform.backing.GlobusUploadBacking;
@@ -41,10 +43,23 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.rsna.ctp.pipeline.Status;
+
+import com.github.jmchilton.blend4j.galaxy.GalaxyInstance;
+import com.github.jmchilton.blend4j.galaxy.GalaxyInstanceFactory;
+import com.github.jmchilton.blend4j.galaxy.HistoriesClient;
+import com.github.jmchilton.blend4j.galaxy.WorkflowsClient;
+import com.github.jmchilton.blend4j.galaxy.beans.History;
+import com.github.jmchilton.blend4j.galaxy.beans.Workflow;
+import com.github.jmchilton.blend4j.galaxy.beans.WorkflowInputs;
+import com.github.jmchilton.blend4j.galaxy.beans.WorkflowOutputs;
+
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -147,22 +162,28 @@ public class WaveformGlobusConnect {
 	 * 	DestinationMyProxy - The destination proxy used to activate the destination endpoint. e.g. "gcmu-02.cvrgrid.org"
 	 */
 	public static void main(String[] args) {
-
+				
+		long tTotalStart = System.nanoTime();
+		
 		WaveformGlobusConnect waveformGlobusConnect = new WaveformGlobusConnect();
 		GlobusConnectConfiguration globusConnectConfiguration = waveformGlobusConnect.getGlobusConnectConfiguration();
-		try{
-			globusConnectConfiguration.setSourceRoot(args[0]);
-			globusConnectConfiguration.setDestinationRoot(args[1]);
-			globusConnectConfiguration.setGlobusOnlineUsername(args[2]);
-			globusConnectConfiguration.setGlobusOnlinePassword(args[3]);
-			globusConnectConfiguration.setDestinationUsername(args[4]);
-			globusConnectConfiguration.setDestinationPassword(args[5]);
-			globusConnectConfiguration.setDestinationMyProxy(args[6]);
+		try{ 
+			globusConnectConfiguration.setSourceRoot(args[0]); 				// "/home/WIN/mshipwa1/Downloads/samples/ECGtestData/ECG 2 leads/" or "/media/Hitachi/physionet.org/physiobank/database/mimic2wdb/30/3000003"
+			globusConnectConfiguration.setDestinationRoot(args[1]); 		// "/home/WIN/cvrgglobusproc/wftest/" 
+			globusConnectConfiguration.setGlobusOnlineUsername(args[2]);	// "wftest" 
+			globusConnectConfiguration.setGlobusOnlinePassword(args[3]);	// "MaryHad1Lamb" 
+			globusConnectConfiguration.setDestinationUsername(args[4]);		// "cvrgglobusproc" 
+			globusConnectConfiguration.setDestinationPassword(args[5]);		// "#Cft6Vgy7!"
+			globusConnectConfiguration.setDestinationMyProxy(args[6]);		// "gcmu-02.cvrgrid.org"
 		}catch(Exception arrayex){
 			arrayex.printStackTrace();
 			System.out.println("input parameters should be: SourceRoot DestinationRoot GlobusOnlineUsername GlobusOnlinePassword DestinationUsername DestinationPassword DestinationMyProxy");
 			System.exit(0);
 		}
+		String[] headerFileExtensions = {"hea"}; // list of extensions which the record header files might have (must be "hea" for WFDB)
+		List<String> headerPaths = waveformGlobusConnect.transferFolder(globusConnectConfiguration, headerFileExtensions);
+		
+		
 		GoauthClient cli = new GoauthClient("nexus.api.globusonline.org", "https://www.globusonline.org", args[2], args[3]);
 		cli.setIgnoreCertErrors(true);
 		String accessToken = null;
@@ -204,8 +225,152 @@ public class WaveformGlobusConnect {
 			System.out.println(globusConnectConfiguration.getSourceEP() + " needs to be connected for data to transfer to " + globusConnectConfiguration.getDestinationEP());	
 		}
 
+		//********************* Galaxy test section **********************
+		long tGalaxyStart = System.nanoTime();
+		final String instanceUrl = "http://ec2-54-211-1-192.compute-1.amazonaws.com:8081/";
+		final String apiKey = "ed6d88d896b8d770254c6ab8e6abe201";
+//	    String globusEndpoint  = globusConnectConfiguration.getDestinationEP(); //  "cvrgglobusproc#gcmu-02";
+		String workFlowName = "Copy of CVRG - sqrs with data transfer";
+		String historyName = "wftest533";
+//		String fileName = "3793588_0001";
+//		String filePath = "~/matched/s00402/"; 
+		int i=0;
+		for(String header:headerPaths){
+			if(header.contains("_")){ // only analyze mimic2 data in the form "3793588_XXXX"
+				if(!header.contains("_layout")){// where "_XXXX" is not "_layout", e.g. is a number
+					String relativePath = header.replace("~/", globusConnectConfiguration.getDestinationRoot()); //e.g.changes "~/3000003_0008.hea" to "/home/WIN/cvrgglobusproc/wftest500/3000003_0008.hea"
+					galaxyParameter[] paramArray = waveformGlobusConnect.buildGalaxyParameter(relativePath);
+					RunGalaxyWorkflow rGW = new RunGalaxyWorkflow();
+		//			rGW.runGalaxyWF(instanceUrl, apiKey, workFlowName, historyName, false, globusEndpoint, paramArray);
+					rGW.runGalaxyWF(instanceUrl, apiKey, workFlowName, historyName, true, paramArray);
+				}
+			}
+		}
+		
+		long tEnd = System.nanoTime();
+		long tTotalRes = tEnd - tTotalStart; // total time in nanoseconds
+		long tGalaxyRes = tEnd - tGalaxyStart; // time in nanoseconds of Galaxy API section
+		long tGlobusRes = tGalaxyStart - tTotalStart; // Time in nanosecond of Globus section
+		System.out.println("Globus Time: " + tGlobusRes/1000000000 + " sec");
+		System.out.println("Galaxy Time: " + tGalaxyRes/1000000000 + " sec");
+		System.out.println("Total Time: " + tTotalRes/1000000000 + " sec");
+		//********************* Old Galaxy test section **********************
+//		final String instanceUrl = "http://ec2-54-211-1-192.compute-1.amazonaws.com:8081/";
+//		final String apiKey = "ed6d88d896b8d770254c6ab8e6abe201";
+//		final String workFlowTemplate = "ZZZZZZZZZZ";
+//		String historyName = "test3";
+//	    String fileName = "3793588_0035";
+//	    String filePath = globusConnectConfiguration.getDestinationRoot(); // "~/matched/s00402/";
+//	    String globusEndpoint  = globusConnectConfiguration.getDestinationEP(); //  "cvrgglobusproc#gcmu-02";
+
+		//runGalaxyWFHack(instanceUrl, apiKey, workFlowTemplate, historyName, fileName, filePath, globusEndpoint);
+
 	}
 
+	/** Builds the Galaxy Parameter array needed by the workflow "Copy of CVRG - sqrs with data transfer".
+	 * 
+	 * @param headerPathS
+	 * @return
+	 */
+	private galaxyParameter[] buildGalaxyParameter(String headerPath){
+		headerPath = headerPath.substring(0, headerPath.length()-4); // trim last 4 characters off (".hea")
+		
+		galaxyParameter[] paramArray = new galaxyParameter[4];
+
+		// input, WFDB header file
+		paramArray[0] = new galaxyParameter();
+		paramArray[0].setStepIdNumber(487);
+		paramArray[0].setStepParameterName("globus_get_data");
+		paramArray[0].setValue(headerPath + ".hea");
+		paramArray[0].setParamName("from_path");
+		// input, WFDB header file
+		paramArray[1] = new galaxyParameter();
+		paramArray[1].setStepIdNumber(486);
+		paramArray[1].setStepParameterName("globus_get_data");
+		paramArray[1].setValue(headerPath + ".dat");
+		paramArray[1].setParamName("from_path");
+		// output, WFDB header file
+		paramArray[2] = new galaxyParameter();
+		paramArray[2].setStepIdNumber(495);
+		paramArray[2].setStepParameterName("globus_send_data");
+		paramArray[2].setValue(headerPath + "_sqrs.txt");
+		paramArray[2].setParamName("to_path");
+		// output, WFDB header file
+		paramArray[3] = new galaxyParameter();
+		paramArray[3].setStepIdNumber(494);
+		paramArray[3].setStepParameterName("globus_send_data");
+		paramArray[3].setValue(headerPath + "_wqrs.txt");
+		paramArray[3].setParamName("to_path");
+		
+		return paramArray;
+	}
+	
+	/** Transfers the contents of a folder (all files and subfolders) from the local source endpoint to the remote endpoint. Returns a list of records sent.
+	 * 
+	 * @param globusConnectConfiguration - has the connection criteria needed to make a Globus transfer <BR>
+	 * e.g. SourceRoot, DestinationRoot, GlobusOnlineUsername, GlobusOnlinePassword, DestinationUsername, DestinationPassword, DestinationMyProxy
+	 * @param extensions - list of extensions which the record header files might have (must be "hea" for WFDB). Used to create return list.
+	 * 
+	 * @return - arrayList of header files for all records found, includes the relative path and extension. e.g. "~/30/3000003_0001.hea"
+	 */
+	public ArrayList<String> transferFolder(GlobusConnectConfiguration globusConnectConfiguration, String[] extensions){
+		/*
+		GoauthClient cli = new GoauthClient("nexus.api.globusonline.org", "https://www.globusonline.org",
+				globusConnectConfiguration.getGlobusOnlineUsername(), globusConnectConfiguration.getGlobusOnlinePassword());
+		cli.setIgnoreCertErrors(true);
+		String accessToken = null;
+		try {
+
+			JSONObject accessTokenJSON = cli.getClientOnlyAccessToken();
+			accessToken = accessTokenJSON.getString("access_token");
+			cli.validateAccessToken(accessToken);
+
+		} catch (NexusClientException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		Authenticator authenticator = new GoauthAuthenticator(accessToken);
+		try {
+			JSONTransferAPIClient client = new JSONTransferAPIClient(globusConnectConfiguration.getGlobusOnlineUsername(), null, null);
+			client.setAuthenticator(authenticator);
+			globusConnectConfiguration.setClient(client);
+		} catch (Exception e) {
+			System.err.println("Got an exception..\n");
+			System.err.println(e.getMessage());
+			System.err.println(e.getStackTrace().toString());
+
+			e.printStackTrace();
+		}
+		setGlobusConnectConfiguration(globusConnectConfiguration);
+		GlobusUploadBacking globusUploadBacking = new GlobusUploadBacking(globusConnectConfiguration);
+		if (isOnlineGC(globusConnectConfiguration, globusUploadBacking)) {
+			if(!isOnlineGCMU(globusConnectConfiguration, globusUploadBacking)) {
+				System.out.println(globusConnectConfiguration.getDestinationEP() + " needs to be activated for data to transfer from " + globusConnectConfiguration.getSourceEP());
+				activateEP(globusConnectConfiguration, globusConnectConfiguration.getDestinationUsername(), globusConnectConfiguration.getDestinationPassword(), globusConnectConfiguration.getDestinationEP());
+			}
+			System.out.println("Transferring data from " + globusConnectConfiguration.getSourceEP() + " to " + globusConnectConfiguration.getDestinationEP());
+			System.out.println(export(globusConnectConfiguration));
+		} else {
+			System.out.println(globusConnectConfiguration.getSourceEP() + " needs to be connected for data to transfer to " + globusConnectConfiguration.getDestinationEP());	
+		}
+		*/
+		File rootDir = new File(globusConnectConfiguration.getSourceRoot());
+		
+		Collection<File> headerFiles = FileUtils.listFiles(rootDir, extensions, true); // Finds files within a given directory and its subdirectories, which match the extension "hea".
+		String sourceRoot = globusConnectConfiguration.getSourceRoot();
+		ArrayList<String> headerList = new ArrayList<String>();
+		for(File file:headerFiles){
+			String headerPath = file.getPath().replace(sourceRoot, "~/"); // change absolute local path to path relative to local Globus root.
+			headerList.add(headerPath);
+			System.err.println(headerPath);
+		}
+
+		return headerList;
+	}
+	
 	/**
 	 * Public API intended for invocation of the GlobusExportService written by Dina
 	 */
@@ -541,5 +706,86 @@ public class WaveformGlobusConnect {
 		}
 		return onlineGCMU;
 	}
+	
+	  /** Creates and runs a Galaxy Workflow based on the workFlowTemplate.<BR>
+	   * Replaces the placeholder text (XXXXXXXXXX and YYYYYYYYYY) in the template workflow with fileName and FilePath.<BR>
+	   * This is a kludge to the go with the hack required to execute a workflow using blend4j library which doesn't accept parameters.<BR>
+	   * 
+	   * @param instanceURL - URL of the Galaxy instance run the workflow on.
+	   * @param apiKey - the Galaxy API key for a user who can access the templateWorkflow.
+	   * @param workFlowTemplate - the name of workflow template e.g. "ZZZZZZZZZZ"
+	   * @param workflowJSON - JSON representation of the (sqrs) template workflow.
+	   * @param historyName - name of an existing history to record the execution of new workflow in.
+	   * @param recordName - WFDB record name (e.g. "3793588_0035") assumed to be the filename of the ".hea" file and of a single ".dat" file.
+	   * @param filePath - Relative location of the WFDB record on Globus Server (e.g. "~/matched/s00402/").
+	   * @param globusEndpoint - name of the Globus endpoint containing the WFDB record files (e.g. "cvrgglobusproc#gcmu-02")
+	   * @return
+	   */
+/*	  public static void runGalaxyWF(final String instanceURL, final String apiKey, final String workFlowTemplate, String historyName,
+			  String fileName, String filePath, String globusEndpoint) {
+		    final GalaxyInstance instance = GalaxyInstanceFactory.get(instanceURL, apiKey);
+		    final WorkflowsClient workflowsClient = instance.getWorkflowsClient();
 
+		    // Find history
+		    System.out.println("Find history: ");
+		    final HistoriesClient historyClient = instance.getHistoriesClient();
+		    History matchingHistory = null;
+		    for(final History history : historyClient.getHistories()) {
+		      if(history.getName().equals(historyName)) { // blend4j Test History // TestHistory1 
+		        matchingHistory = history;
+		        System.out.println(history.getId() + ") " + history.getName());
+		      }
+		    }
+
+		    System.out.println("Find workflow: ");
+		    Workflow matchingWorkflow = null;
+		    for(Workflow workflow : workflowsClient.getWorkflows()) {
+		      if(workflow.getName().equals(workFlowTemplate)) {
+		        matchingWorkflow = workflow;
+		        System.out.println(workflow.getId() + ") " + workflow.getName());
+		      }
+		    }
+
+		    String workflowJSON = workflowsClient.exportWorkflow(matchingWorkflow.getId());	    
+			 // modify workflow json
+		    workflowJSON = replaceFileNameJSON(workflowJSON, fileName, filePath, globusEndpoint);
+//		    System.out.println("JSON-encoded representation of the Workflow:\n" + workflowJSON);
+		    Workflow importedWorkflow = workflowsClient.importWorkflow(workflowJSON);
+		    String importedWorkflowId = importedWorkflow.getId();
+		    
+		    final WorkflowInputs inputs = new WorkflowInputs();
+		    inputs.setDestination(new WorkflowInputs.ExistingHistory(matchingHistory.getId()));
+		    inputs.setWorkflowId(importedWorkflowId);
+		   
+		    final WorkflowOutputs output = workflowsClient.runWorkflow(inputs);
+		    System.out.println("Running workflow in history " + output.getHistoryId());
+		    for(String outputId : output.getOutputIds()) {
+		      System.out.println("  Workflow writing to output id " + outputId);
+		    }
+		  }
+	  
+	  
+	  *//** Replaces the placeholder text (XXXXXXXXXX and YYYYYYYYYY) in the template workflow ZZZZZZZZZZ with fileName and FilePath.<BR>
+	   * This is a kludge to the go with the hack required to execute a workflow using blend4j library which doesn't accept parameters.<BR>
+	   * It is not efficient, and will probably still run faster than the workflow itself.
+	   * 
+	   * @param workflowJSON - JSON representation of the (sqrs) template workflow.
+	   * @param recordName - WFDB record name (e.g. "3793588_0035") assumed to be the filename of the ".hea" file and of a single ".dat" file.
+	   * @param filePath - Relative location of the WFDB record on Globus Server (e.g. "~/matched/s00402/").
+	   * @param globusEndpoint - name of the Globus endpoint containing the WFDB record files (e.g. "cvrgglobusproc#gcmu-02")
+	   * @return
+	   *//*
+	  private static String replaceFileNameJSON(String workflowJSON, String recordName, String filePath, String globusEndpoint){
+		  Date date = new Date();
+	      SimpleDateFormat ft = new SimpleDateFormat ("'SQRS_" + recordName + "' yyyy.MM.dd  hh:mm:ss a");
+		  String workflowName = ft.format(date);
+		  
+		  workflowJSON = workflowJSON.replace("WWWWWWWWWW", globusEndpoint); // e.g. "cvrgglobusproc#gcmu-02"
+		  workflowJSON = workflowJSON.replace("XXXXXXXXXX", recordName); // e.g. "3793588_0035"
+		  workflowJSON = workflowJSON.replace("YYYYYYYYYY", filePath);	// e.g. "~/matched/s00402/"
+		  workflowJSON = workflowJSON.replace("ZZZZZZZZZZ", workflowName);	  
+		  
+		  return workflowJSON;	  
+	  }
+*/
 }

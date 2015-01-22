@@ -325,6 +325,8 @@ public class GlobusUploadBacking {
 	 */
 	public Map<String, GlobusEndpointList> getGlobusEndpointLists() {
 		return globusEndpointLists;
+		
+//		String input="ABC";
 	}
 
 	/**
@@ -333,5 +335,7 @@ public class GlobusUploadBacking {
 	public void setGlobusEndpointLists(Map<String, GlobusEndpointList> globusEndpointLists) {
 		this.globusEndpointLists = globusEndpointLists;
 	}
+	
+	
 
 }
